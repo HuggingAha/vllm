@@ -7,10 +7,8 @@ from typing import Dict, List, Optional, Tuple
 import torch
 
 from vllm.sampling_params import SamplingParams, SamplingType
-from vllm.sequence import (VLLM_TOKEN_ID_ARRAY_TYPE, SequenceData,
-                           SequenceGroupMetadata)
-from vllm.utils import (PyObjectCache, async_tensor_h2d,
-                        is_pin_memory_available, make_tensor_with_pad)
+from vllm.sequence import VLLM_TOKEN_ID_ARRAY_TYPE, SequenceData, SequenceGroupMetadata
+from vllm.utils import PyObjectCache, async_tensor_h2d, is_pin_memory_available, make_tensor_with_pad
 
 _SAMPLING_EPS = 1e-5
 
@@ -82,8 +80,7 @@ class SamplingMetadataCache:
 
     def get_cached_seq_group_to_sample(self, num_seqs):
         if num_seqs not in self._seq_group_to_sample_cache:
-            self._seq_group_to_sample_cache[num_seqs] = PyObjectCache(
-                gen_seq_group_to_sample_builder(num_seqs))
+            self._seq_group_to_sample_cache[num_seqs] = PyObjectCache(gen_seq_group_to_sample_builder(num_seqs))
 
         obj = self._seq_group_to_sample_cache[num_seqs].get_object()
         return obj
@@ -159,8 +156,7 @@ class SamplingMetadata:
             selected_token_indices,
             categorized_sample_indices,
             num_prompts,
-        ) = _prepare_seq_groups(seq_group_metadata_list, seq_lens, query_lens,
-                                device, generators, cache)
+        ) = _prepare_seq_groups(seq_group_metadata_list, seq_lens, query_lens, device, generators, cache)
         selected_token_indices = async_tensor_h2d(
             selected_token_indices,
             dtype=torch.long,
@@ -168,8 +164,7 @@ class SamplingMetadata:
             pin_memory=pin_memory,
         )
         categorized_sample_indices = {
-            t:
-            async_tensor_h2d(
+            t: async_tensor_h2d(
                 seq_ids,
                 dtype=torch.int,
                 target_device=device,
@@ -191,7 +186,8 @@ class SamplingMetadata:
             "SamplingMetadata("
             f"seq_groups={self.seq_groups}, "
             f"selected_token_indices={self.selected_token_indices}, "
-            f"categorized_sample_indices={self.categorized_sample_indices}), ")
+            f"categorized_sample_indices={self.categorized_sample_indices}), "
+        )
 
 
 def _prepare_seq_groups(
@@ -202,10 +198,10 @@ def _prepare_seq_groups(
     generators: Optional[Dict[str, torch.Generator]] = None,
     cache: Optional[SamplingMetadataCache] = None,
 ) -> Tuple[
-        List[SequenceGroupToSample],
-        List[int],
-        Dict[SamplingType, List[int]],
-        int,
+    List[SequenceGroupToSample],
+    List[int],
+    Dict[SamplingType, List[int]],
+    int,
 ]:
     """Prepare sequence groups and indices for sampling.
 
@@ -237,10 +233,7 @@ def _prepare_seq_groups(
     # Sampling type -> (
     # indices to sample/prompt logprob within pruned output logits,
     # indices to sample within pruned logits)
-    categorized_sample_indices: Dict[SamplingType, List[int]] = {
-        t: []
-        for t in SamplingType
-    }
+    categorized_sample_indices: Dict[SamplingType, List[int]] = {t: [] for t in SamplingType}
     # Index of logits to compute logprob. Logits include both prompt logprob
     # and sample logprob indices.
     logit_idx = 0
@@ -265,16 +258,13 @@ def _prepare_seq_groups(
         # If the current seq group is in decode stage, it is None.
         seq_len: Optional[int] = None
         query_len: Optional[int] = None
-        prompt_logprob_indices: List[int] = (sample_obj.prompt_logprob_indices
-                                             if cache is not None else [])
-        sample_indices: List[int] = (sample_obj.sample_indices
-                                     if cache is not None else [])
+        prompt_logprob_indices: List[int] = sample_obj.prompt_logprob_indices if cache is not None else []
+        sample_indices: List[int] = sample_obj.sample_indices if cache is not None else []
         do_sample = seq_group_metadata.do_sample
 
         if seq_group_metadata.is_prompt:
             if sampling_params.seed is not None:
-                generator = torch.Generator(device=device).manual_seed(
-                    sampling_params.seed)
+                generator = torch.Generator(device=device).manual_seed(sampling_params.seed)
                 if generators is not None:
                     generators[seq_group_metadata.request_id] = generator
 
@@ -285,14 +275,12 @@ def _prepare_seq_groups(
             query_len, seq_len = query_lens[i], seq_lens[i]
             # If we need sampling, exclude num_prefill_sample tokens from
             # prompt logprob.
-            prompt_logprob_len = (query_len - num_prefill_sample
-                                  if do_sample else query_len)
+            prompt_logprob_len = query_len - num_prefill_sample if do_sample else query_len
             sample_len = num_prefill_sample if do_sample else 0
         else:
             # Decode
             prompt_logprob_len = 0
-            query_len = query_lens[i] if query_lens is not None and len(
-                query_lens) > 0 else 1
+            query_len = query_lens[i] if query_lens is not None and len(query_lens) > 0 else 1
             sample_len = len(seq_ids) * query_len if do_sample else 0
 
             if sampling_params.seed is not None and generators is not None:
@@ -308,12 +296,10 @@ def _prepare_seq_groups(
         """
 
         if sampling_params.prompt_logprobs is not None:
-            selected_token_indices.extend(
-                range(model_output_idx, model_output_idx + prompt_logprob_len))
+            selected_token_indices.extend(range(model_output_idx, model_output_idx + prompt_logprob_len))
         model_output_idx += prompt_logprob_len
         if do_sample:
-            selected_token_indices.extend(
-                range(model_output_idx, model_output_idx + sample_len))
+            selected_token_indices.extend(range(model_output_idx, model_output_idx + sample_len))
         model_output_idx += sample_len
 
         # We now find indices for logprob computation and sampling.
@@ -330,13 +316,13 @@ def _prepare_seq_groups(
         """
 
         if sampling_params.prompt_logprobs is not None:
-            prompt_logprob_indices.extend(
-                range(logit_idx, logit_idx + prompt_logprob_len))
+            prompt_logprob_indices.extend(range(logit_idx, logit_idx + prompt_logprob_len))
             logit_idx += prompt_logprob_len
         if do_sample:
             sample_indices.extend(range(logit_idx, logit_idx + sample_len))
             categorized_sample_indices[sampling_params.sampling_type].extend(
-                list(range(logit_idx, logit_idx + sample_len)))
+                list(range(logit_idx, logit_idx + sample_len))
+            )
             logit_idx += sample_len
 
         if cache is not None:
@@ -364,8 +350,7 @@ def _prepare_seq_groups(
     if cache is not None:
         cache.reset()
 
-    return (seq_groups, selected_token_indices, categorized_sample_indices,
-            num_prompts)
+    return (seq_groups, selected_token_indices, categorized_sample_indices, num_prompts)
 
 
 @dataclass
@@ -376,6 +361,7 @@ class SamplingTensors:
     top_ps: torch.Tensor
     top_ks: torch.Tensor
     min_ps: torch.Tensor
+    top_n_sigmas: torch.Tensor
     presence_penalties: torch.Tensor
     frequency_penalties: torch.Tensor
     repetition_penalties: torch.Tensor
@@ -396,12 +382,14 @@ class SamplingTensors:
         temperatures: List[float] = []
         top_ps: List[float] = []
         min_ps: List[float] = []
+        top_n_sigmas: List[float] = []
         presence_penalties: List[float] = []
         frequency_penalties: List[float] = []
         repetition_penalties: List[float] = []
         do_penalties = False
         do_top_p_top_k = False
         do_min_p = False
+        do_top_n_sigma = False
 
         assert sampling_metadata.seq_groups is not None
         for seq_group in sampling_metadata.seq_groups:
@@ -413,6 +401,7 @@ class SamplingTensors:
             r = sampling_params.repetition_penalty
             top_p = sampling_params.top_p
             min_p = sampling_params.min_p
+            top_n_sigma = sampling_params.top_n_sigma
 
             # k should not be greater than the vocab size.
             top_k = min(sampling_params.top_k, vocab_size)
@@ -422,14 +411,15 @@ class SamplingTensors:
                 # (i.e., greedy sampling or beam search).
                 # Set the temperature to 1 to avoid division by zero.
                 temperature = 1.0
-            if not do_top_p_top_k and (top_p < 1.0 - _SAMPLING_EPS
-                                       or top_k != vocab_size):
+            if not do_top_p_top_k and (top_p < 1.0 - _SAMPLING_EPS or top_k != vocab_size):
                 do_top_p_top_k = True
             if not do_min_p and min_p > _SAMPLING_EPS:
                 do_min_p = True
-            if not do_penalties and (abs(p) >= _SAMPLING_EPS
-                                     or abs(f) >= _SAMPLING_EPS
-                                     or abs(r - 1.0) >= _SAMPLING_EPS):
+            if not do_top_n_sigma and top_n_sigma > _SAMPLING_EPS:
+                do_top_n_sigma = True
+            if not do_penalties and (
+                abs(p) >= _SAMPLING_EPS or abs(f) >= _SAMPLING_EPS or abs(r - 1.0) >= _SAMPLING_EPS
+            ):
                 do_penalties = True
 
             is_prompt = seq_group.is_prompt
@@ -443,6 +433,7 @@ class SamplingTensors:
                 top_ps += [top_p] * prefill_len
                 top_ks += [top_k] * prefill_len
                 min_ps += [min_p] * prefill_len
+                top_n_sigmas += [top_n_sigma] * prefill_len
                 presence_penalties += [0] * prefill_len
                 frequency_penalties += [0] * prefill_len
                 repetition_penalties += [1] * prefill_len
@@ -454,6 +445,7 @@ class SamplingTensors:
                 top_ps += [top_p] * sample_lens
                 top_ks += [top_k] * sample_lens
                 min_ps += [min_p] * sample_lens
+                top_n_sigmas += [top_n_sigma] * sample_lens
                 presence_penalties += [p] * sample_lens
                 frequency_penalties += [f] * sample_lens
                 repetition_penalties += [r] * sample_lens
@@ -462,15 +454,10 @@ class SamplingTensors:
             for seq_group in sampling_metadata.seq_groups:
                 seq_ids = seq_group.seq_ids
                 sampling_params = seq_group.sampling_params
-                if (seq_group.is_prompt
-                        and sampling_params.prompt_logprobs is not None):
+                if seq_group.is_prompt and sampling_params.prompt_logprobs is not None:
                     prefill_len = len(seq_group.prompt_logprob_indices)
-                    prompt_tokens.extend(
-                        array(VLLM_TOKEN_ID_ARRAY_TYPE)
-                        for _ in range(prefill_len))
-                    output_tokens.extend(
-                        array(VLLM_TOKEN_ID_ARRAY_TYPE)
-                        for _ in range(prefill_len))
+                    prompt_tokens.extend(array(VLLM_TOKEN_ID_ARRAY_TYPE) for _ in range(prefill_len))
+                    output_tokens.extend(array(VLLM_TOKEN_ID_ARRAY_TYPE) for _ in range(prefill_len))
                 if seq_group.do_sample:
                     for seq_id in seq_ids:
                         seq_data = seq_group.seq_data[seq_id]
@@ -482,6 +469,7 @@ class SamplingTensors:
             top_ps,
             top_ks,
             min_ps,
+            top_n_sigmas,
             presence_penalties,
             frequency_penalties,
             repetition_penalties,
@@ -491,7 +479,7 @@ class SamplingTensors:
             device,
             dtype,
         )
-        return (sampling_tensors, do_penalties, do_top_p_top_k, do_min_p)
+        return (sampling_tensors, do_penalties, do_top_p_top_k, do_min_p, do_top_n_sigma)
 
     @classmethod
     def from_lists(
@@ -500,6 +488,7 @@ class SamplingTensors:
         top_ps: List[float],
         top_ks: List[int],
         min_ps: List[float],
+        top_n_sigmas: List[float],
         presence_penalties: List[float],
         frequency_penalties: List[float],
         repetition_penalties: List[float],
@@ -553,6 +542,12 @@ class SamplingTensors:
             dtype=dtype,
             pin_memory=pin_memory,
         )
+        top_n_sigmas_t = torch.tensor(
+            top_n_sigmas,
+            device="cpu",
+            dtype=dtype,
+            pin_memory=pin_memory,
+        )
         presence_penalties_t = torch.tensor(
             presence_penalties,
             device="cpu",
@@ -585,12 +580,10 @@ class SamplingTensors:
             top_ps=top_ps_t.to(device=device, non_blocking=True),
             top_ks=top_ks_t.to(device=device, non_blocking=True),
             min_ps=min_ps_t.to(device=device, non_blocking=True),
-            presence_penalties=presence_penalties_t.to(device=device,
-                                                       non_blocking=True),
-            frequency_penalties=frequency_penalties_t.to(device=device,
-                                                         non_blocking=True),
-            repetition_penalties=repetition_penalties_t.to(device=device,
-                                                           non_blocking=True),
+            top_n_sigmas=top_n_sigmas_t.to(device=device, non_blocking=True),
+            presence_penalties=presence_penalties_t.to(device=device, non_blocking=True),
+            frequency_penalties=frequency_penalties_t.to(device=device, non_blocking=True),
+            repetition_penalties=repetition_penalties_t.to(device=device, non_blocking=True),
             prompt_tokens=prompt_t.to(device=device, non_blocking=True),
             output_tokens=output_t.to(device=device, non_blocking=True),
         )
