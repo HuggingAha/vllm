@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Sampling parameters for text generation."""
+
 import copy
 from dataclasses import dataclass
 from enum import Enum, IntEnum
@@ -75,13 +76,16 @@ class GuidedDecodingParams:
     def __post_init__(self):
         """Validate that some fields are mutually exclusive."""
         guide_count = sum([
-            self.json is not None, self.regex is not None, self.choice
-            is not None, self.grammar is not None, self.json_object is not None
+            self.json is not None,
+            self.regex is not None,
+            self.choice is not None,
+            self.grammar is not None,
+            self.json_object is not None,
         ])
         if guide_count > 1:
             raise ValueError(
-                "You can only use one kind of guided decoding but multiple are "
-                f"specified: {self.__dict__}")
+                f"You can only use one kind of guided decoding but multiple are specified: {self.__dict__}"
+            )
 
         if self.backend is not None and ":" in self.backend:
             self._extract_backend_options()
@@ -115,10 +119,11 @@ class RequestOutputKind(Enum):
 
 
 class SamplingParams(
-        msgspec.Struct,
-        omit_defaults=True,  # type: ignore[call-arg]
-        # required for @cached_property.
-        dict=True):  # type: ignore[call-arg]
+    msgspec.Struct,
+    omit_defaults=True,  # type: ignore[call-arg]
+    # required for @cached_property.
+    dict=True,
+):  # type: ignore[call-arg]
     """Sampling parameters for text generation.
 
     Overall, we follow the sampling parameters from the OpenAI text completion
@@ -153,6 +158,9 @@ class SamplingParams(
         min_p: Float that represents the minimum probability for a token to be
             considered, relative to the probability of the most likely token.
             Must be in [0, 1]. Set to 0 to disable this.
+        top_n_sigma: Float that represents the number of standard deviations from the maximum logit value
+            for a token to be considered. Higher values retain fewer tokens. A typical range is
+            [1, 5]. Set to 0 to disable this.
         seed: Random seed to use for the generation.
         stop: list of strings that stop the generation when they are generated.
             The returned output will not contain the stop strings.
@@ -211,6 +219,7 @@ class SamplingParams(
     top_p: float = 1.0
     top_k: int = 0
     min_p: float = 0.0
+    top_n_sigma: float = 0.0
     seed: Optional[int] = None
     stop: Optional[Union[str, list[str]]] = None
     stop_token_ids: Optional[list[int]] = None
@@ -258,6 +267,7 @@ class SamplingParams(
         top_p: Optional[float] = 1.0,
         top_k: int = 0,
         min_p: float = 0.0,
+        top_n_sigma: float = 0.0,
         seed: Optional[int] = None,
         stop: Optional[Union[str, list[str]]] = None,
         stop_token_ids: Optional[list[int]] = None,
@@ -291,16 +301,14 @@ class SamplingParams(
         return SamplingParams(
             n=1 if n is None else n,
             best_of=best_of,
-            presence_penalty=0.0
-            if presence_penalty is None else presence_penalty,
-            frequency_penalty=0.0
-            if frequency_penalty is None else frequency_penalty,
-            repetition_penalty=1.0
-            if repetition_penalty is None else repetition_penalty,
+            presence_penalty=0.0 if presence_penalty is None else presence_penalty,
+            frequency_penalty=0.0 if frequency_penalty is None else frequency_penalty,
+            repetition_penalty=1.0 if repetition_penalty is None else repetition_penalty,
             temperature=1.0 if temperature is None else temperature,
             top_p=1.0 if top_p is None else top_p,
             top_k=top_k,
             min_p=min_p,
+            top_n_sigma=top_n_sigma,
             seed=seed,
             stop=stop,
             stop_token_ids=stop_token_ids,
@@ -333,8 +341,8 @@ class SamplingParams(
         if self.best_of:
             if self.best_of < self.n:
                 raise ValueError(
-                    f"best_of must be greater than or equal to n, "
-                    f"got n={self.n} and best_of={self.best_of}.")
+                    f"best_of must be greater than or equal to n, got n={self.n} and best_of={self.best_of}."
+                )
             if not self._real_n:
                 self._real_n = self.n
                 self.n = self.best_of
@@ -343,7 +351,10 @@ class SamplingParams(
             logger.warning(
                 "temperature %s is less than %s, which may cause numerical "
                 "errors nan or inf in tensors. We have maxed it out to %s.",
-                self.temperature, _MAX_TEMP, _MAX_TEMP)
+                self.temperature,
+                _MAX_TEMP,
+                _MAX_TEMP,
+            )
             self.temperature = max(self.temperature, _MAX_TEMP)
 
         if self.seed == -1:
@@ -378,6 +389,7 @@ class SamplingParams(
             self.top_p = 1.0
             self.top_k = 0
             self.min_p = 0.0
+            self.top_n_sigma = 0.0
             self._verify_greedy_sampling()
 
         # eos_token_id is added to this by the engine
@@ -385,13 +397,11 @@ class SamplingParams(
 
     def _verify_args(self) -> None:
         if not isinstance(self.n, int):
-            raise ValueError(f"n must be an int, but is of "
-                             f"type {type(self.n)}")
+            raise ValueError(f"n must be an int, but is of type {type(self.n)}")
         if self.n < 1:
             raise ValueError(f"n must be at least 1, got {self.n}.")
         if not -2.0 <= self.presence_penalty <= 2.0:
-            raise ValueError("presence_penalty must be in [-2, 2], got "
-                             f"{self.presence_penalty}.")
+            raise ValueError(f"presence_penalty must be in [-2, 2], got {self.presence_penalty}.")
         if not -2.0 <= self.frequency_penalty <= 2.0:
             raise ValueError("frequency_penalty must be in [-2, 2], got "
                              f"{self.frequency_penalty}.")
@@ -400,8 +410,7 @@ class SamplingParams(
                 "repetition_penalty must be greater than zero, got "
                 f"{self.repetition_penalty}.")
         if self.temperature < 0.0:
-            raise ValueError(
-                f"temperature must be non-negative, got {self.temperature}.")
+            raise ValueError(f"temperature must be non-negative, got {self.temperature}.")
         if not 0.0 < self.top_p <= 1.0:
             raise ValueError(f"top_p must be in (0, 1], got {self.top_p}.")
         # quietly accept -1 as disabled, but prefer 0
@@ -409,24 +418,21 @@ class SamplingParams(
             raise ValueError(f"top_k must be 0 (disable), or at least 1, "
                              f"got {self.top_k}.")
         if not isinstance(self.top_k, int):
-            raise TypeError(
-                f"top_k must be an integer, got {type(self.top_k).__name__}")
+            raise TypeError(f"top_k must be an integer, got {type(self.top_k).__name__}")
         if not 0.0 <= self.min_p <= 1.0:
-            raise ValueError("min_p must be in [0, 1], got "
-                             f"{self.min_p}.")
+            raise ValueError(f"min_p must be in [0, 1], got {self.min_p}.")
+        if not 0.0 <= self.top_n_sigma <= 5:
+            raise ValueError(f"top_n_sigma must be in [0, 5], got {self.top_n_sigma}.")
         if self.max_tokens is not None and self.max_tokens < 1:
-            raise ValueError(
-                f"max_tokens must be at least 1, got {self.max_tokens}.")
+            raise ValueError(f"max_tokens must be at least 1, got {self.max_tokens}.")
         if self.min_tokens < 0:
-            raise ValueError(f"min_tokens must be greater than or equal to 0, "
-                             f"got {self.min_tokens}.")
+            raise ValueError(f"min_tokens must be greater than or equal to 0, got {self.min_tokens}.")
         if self.max_tokens is not None and self.min_tokens > self.max_tokens:
             raise ValueError(
-                f"min_tokens must be less than or equal to "
-                f"max_tokens={self.max_tokens}, got {self.min_tokens}.")
+                f"min_tokens must be less than or equal to max_tokens={self.max_tokens}, got {self.min_tokens}."
+            )
         if self.logprobs is not None and self.logprobs < 0:
-            raise ValueError(
-                f"logprobs must be non-negative, got {self.logprobs}.")
+            raise ValueError(f"logprobs must be non-negative, got {self.logprobs}.")
         if self.prompt_logprobs is not None and self.prompt_logprobs < 0:
             raise ValueError(f"prompt_logprobs must be non-negative, got "
                              f"{self.prompt_logprobs}.")
@@ -443,16 +449,14 @@ class SamplingParams(
             raise ValueError("stop cannot contain an empty string.")
         if self.stop and not self.detokenize:
             raise ValueError(
-                "stop strings are only supported when detokenize is True. "
-                "Set detokenize=True to use stop.")
-        if self.best_of != self._real_n and self.output_kind == (
-                RequestOutputKind.DELTA):
+                "stop strings are only supported when detokenize is True. Set detokenize=True to use stop."
+            )
+        if self.best_of != self._real_n and self.output_kind == (RequestOutputKind.DELTA):
             raise ValueError("best_of must equal n to use output_kind=DELTA")
 
     def _verify_greedy_sampling(self) -> None:
         if self.n > 1:
-            raise ValueError("n must be 1 when using greedy sampling, "
-                             f"got {self.n}.")
+            raise ValueError(f"n must be 1 when using greedy sampling, got {self.n}.")
 
     def update_from_generation_config(
             self,
@@ -542,10 +546,11 @@ class SamplingParams(
         See https://github.com/vllm-project/vllm/issues/3087
         """
 
-        logit_processor_refs = None if self.logits_processors is None else {
-            id(lp): lp.clone() if hasattr(lp, 'clone') else lp
-            for lp in self.logits_processors
-        }
+        logit_processor_refs = (
+            None
+            if self.logits_processors is None
+            else {id(lp): lp.clone() if hasattr(lp, "clone") else lp for lp in self.logits_processors}
+        )
         return copy.deepcopy(self, memo=logit_processor_refs)
 
     def __repr__(self) -> str:
@@ -558,6 +563,7 @@ class SamplingParams(
             f"top_p={self.top_p}, "
             f"top_k={self.top_k}, "
             f"min_p={self.min_p}, "
+            f"top_n_sigma={self.top_n_sigma}, "
             f"seed={self.seed}, "
             f"stop={self.stop}, "
             f"stop_token_ids={self.stop_token_ids}, "
@@ -577,11 +583,13 @@ class SamplingParams(
 
 
 class BeamSearchParams(
-        msgspec.Struct,
-        omit_defaults=True,  # type: ignore[call-arg]
-        # required for @cached_property.
-        dict=True):  # type: ignore[call-arg]
+    msgspec.Struct,
+    omit_defaults=True,  # type: ignore[call-arg]
+    # required for @cached_property.
+    dict=True,
+):  # type: ignore[call-arg]
     """Beam search parameters for text generation."""
+
     beam_width: int
     max_tokens: int
     ignore_eos: bool = False
