@@ -404,6 +404,16 @@ class ChatCompletionRequest(OpenAIBaseModel):
     kv_transfer_params: Optional[dict[str, Any]] = Field(
         default=None,
         description="KVTransfer parameters used for disaggregated serving.")
+    
+    bad_words: Optional[list[str]] = Field(
+        default=[],
+        description=(
+            "List of words that are not allowed to be generated. "
+            "More precisely, only the last token of a corresponding token "
+            "sequence is not allowed when the next generated token can complete the sequence."
+        ),
+    )
+
 
     # doc: end-chat-completion-extra-params
 
@@ -766,7 +776,7 @@ class CompletionRequest(OpenAIBaseModel):
     truncate_prompt_tokens: Optional[Annotated[int, Field(ge=1)]] = None
     allowed_token_ids: Optional[list[int]] = None
     prompt_logprobs: Optional[int] = None
-    bad_words: Optional[list[str]] = None
+    # bad_words: Optional[list[str]] = None
     # doc: end-completion-sampling-params
 
     # doc: begin-completion-extra-params
