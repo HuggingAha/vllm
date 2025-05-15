@@ -766,6 +766,7 @@ class CompletionRequest(OpenAIBaseModel):
     truncate_prompt_tokens: Optional[Annotated[int, Field(ge=1)]] = None
     allowed_token_ids: Optional[list[int]] = None
     prompt_logprobs: Optional[int] = None
+    bad_words: Optional[list[str]] = None
     # doc: end-completion-sampling-params
 
     # doc: begin-completion-extra-params
