@@ -830,7 +830,7 @@ class CompletionRequest(OpenAIBaseModel):
             "{'param': 'value'}}."
         ),
     )
-    bad_words: Optional[List[str]] = Field(
+    bad_words: Optional[list[str]] = Field(
         default=[],
         description=(
             "List of words that are not allowed to be generated. "
