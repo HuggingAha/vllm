@@ -297,7 +297,7 @@ class ModelConfig:
     - 1K -> 1024\n
     - 25.6k -> 25,600"""
     spec_target_max_model_len: Optional[int] = None
-    """Specify the the maximum length for spec decoding draft models."""
+    """Specify the maximum length for spec decoding draft models."""
     quantization: Optional[QuantizationMethods] = None
     """Method used to quantize the weights. If `None`, we first check the
     `quantization_config` attribute in the model config file. If that is
@@ -3950,11 +3950,12 @@ class CompilationConfig:
             self.cudagraph_capture_sizes = cudagraph_capture_sizes
         else:
             # de-duplicate the sizes provided by the config
-            self.cudagraph_capture_sizes = list(
-                set(self.cudagraph_capture_sizes))
-            logger.info(("cudagraph sizes specified by model runner"
-                         " %s is overridden by config %s"),
-                        cudagraph_capture_sizes, self.cudagraph_capture_sizes)
+            dedup_sizes = list(set(self.cudagraph_capture_sizes))
+            if len(dedup_sizes) < len(self.cudagraph_capture_sizes):
+                logger.info(("cudagraph sizes specified by model runner"
+                             " %s is overridden by config %s"),
+                            cudagraph_capture_sizes, dedup_sizes)
+            self.cudagraph_capture_sizes = dedup_sizes
 
         computed_compile_sizes = []
         if self.compile_sizes is not None:
